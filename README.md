@@ -1,4 +1,4 @@
-# WoodSciForecast-Bench repository scaffold
+# WSF-Bench repository scaffold
 
 This repository contains a cleaned Python implementation of the benchmark workflow used in the manuscript.
 
