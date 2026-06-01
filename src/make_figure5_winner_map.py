@@ -1,136 +1,96 @@
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from matplotlib.colors import ListedColormap
-import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle, Patch
 
-from src.config import ROUND2_RESULTS_FILE, ROUND3_RESULTS_FILE
-from src.figure_utils import (
-    normalize_model_name,
-    normalize_panel_name,
-    normalize_target_name,
-    pretty_block_label,
-    save_figure,
-    set_publication_style,
-)
+from config import MAIN_RESULTS_FILE, TRADE_RECURRENT_RESULTS_FILE, FIGURE_DIR
+from figure_utils import save_figure
+
+COLOURS = {
+    "Seasonal Naive": "#8A8A8A",
+    "ETS": "#4C78A8",
+    "LightGBM (valid)": "#F58518",
+    "Fallback-contingent": "#B8B8B8",
+    "LSTM": "#D62728",
+}
+
+PRODUCTION_ROWS = [
+    ("Production_12c", "Production C16", "Production (12c): C16"),
+    ("Production_12c", "Production C31", "Production (12c): C31"),
+    ("Production_8c", "Production C16", "Production sensitivity (8c): C16"),
+    ("Production_8c", "Production C31", "Production sensitivity (8c): C31"),
+]
+
+TRADE_ROWS = [
+    ("Trade_8c", "Trade export", "Trade (8c): exports"),
+    ("Trade_8c", "Trade import", "Trade (8c): imports"),
+]
+
+
+def _winner_label(model: str) -> str:
+    if model == "LightGBM":
+        return "LightGBM (valid)"
+    if model == "LightGBM_fallback":
+        return "Fallback-contingent"
+    return str(model)
+
+
+def _load_winners() -> tuple[pd.DataFrame, pd.DataFrame]:
+    main = pd.read_excel(MAIN_RESULTS_FILE, sheet_name="summary_by_split_target")
+    recurrent = pd.read_excel(TRADE_RECURRENT_RESULTS_FILE, sheet_name="summary_by_split_target")
+    prod = main[main["panel"].isin(["Production_12c", "Production_8c"])].copy()
+    trade = recurrent[recurrent["panel"] == "Trade_8c"].copy()
+    prod_winners = prod.sort_values(["panel", "target", "split_id", "mean_mase"]).groupby(["panel", "target", "split_id"], as_index=False).first()
+    trade_winners = trade.sort_values(["panel", "target", "split_id", "mean_mase"]).groupby(["panel", "target", "split_id"], as_index=False).first()
+    prod_winners["winner_plot"] = prod_winners["model"].apply(_winner_label)
+    trade_winners["winner_plot"] = trade_winners["model"].apply(_winner_label)
+    return prod_winners, trade_winners
+
+
+def _draw_map(ax, winners: pd.DataFrame, rows: list[tuple[str, str, str]], splits: list[str], title: str) -> None:
+    ax.set_title(title, loc="left", fontweight="bold")
+    for i, (panel, target, row_label) in enumerate(rows):
+        for j, split in enumerate(splits):
+            hit = winners[(winners["panel"] == panel) & (winners["target"] == target) & (winners["split_id"] == split)]
+            label = str(hit["winner_plot"].iloc[0]) if not hit.empty else ""
+            face = COLOURS.get(label, "white")
+            hatch = "///" if label == "Fallback-contingent" else None
+            rect = Rectangle((j, len(rows) - i - 1), 1, 1, facecolor=face, edgecolor="white", linewidth=1.0, hatch=hatch)
+            ax.add_patch(rect)
+            text_colour = "white" if label == "LightGBM (valid)" else "black"
+            display = "LightGBM\n(valid)" if label == "LightGBM (valid)" else "Fallback\ncontingent" if label == "Fallback-contingent" else label
+            ax.text(j + 0.5, len(rows) - i - 0.5, display, ha="center", va="center", fontsize=9, color=text_colour)
+    ax.set_xlim(0, len(splits))
+    ax.set_ylim(0, len(rows))
+    ax.set_xticks(np.arange(len(splits)) + 0.5)
+    ax.set_xticklabels(splits)
+    ax.set_yticks(np.arange(len(rows)) + 0.5)
+    ax.set_yticklabels([r[2] for r in rows][::-1])
+    ax.tick_params(length=0)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
 
 
 def main() -> None:
-    set_publication_style()
-
-    winners_round2 = pd.read_excel(ROUND2_RESULTS_FILE, sheet_name="block_winners")
-    winners_round3 = pd.read_excel(ROUND3_RESULTS_FILE, sheet_name="block_winners")
-
-    for df in [winners_round2, winners_round3]:
-        df["panel_std"] = df["panel"].apply(normalize_panel_name)
-        df["target_std"] = df["target"].apply(normalize_target_name)
-        df["model_std"] = df["model"].apply(normalize_model_name)
-
-    winners_round2["source"] = "round2"
-    winners_round3["source"] = "round3"
-
-    combined = pd.concat([winners_round2, winners_round3], ignore_index=True)
-    priority_map = {"round2": 2, "round3": 3}
-    combined["source_priority"] = combined["source"].map(priority_map)
-    combined = combined.sort_values(["panel_std", "target_std", "split_id", "source_priority"])
-    combined = combined.drop_duplicates(subset=["panel_std", "target_std", "split_id"], keep="last").copy()
-    combined["block"] = combined["panel_std"] + " | " + combined["target_std"]
-
-    prod_order = [
-        "Production_12c | C16",
-        "Production_12c | C31",
-        "Production_8c | C16",
-        "Production_8c | C31",
-    ]
-    trade_order = ["Trade_8c | Exports", "Trade_8c | Imports"]
-    prod_splits = ["S1", "S2", "S3"]
-    trade_splits = ["T1", "T2", "T3"]
-
-    prod_df = combined[combined["block"].isin(prod_order)].copy()
-    trade_df = combined[combined["block"].isin(trade_order)].copy()
-
-    prod_pivot = prod_df.pivot(index="block", columns="split_id", values="model_std")
-    trade_pivot = trade_df.pivot(index="block", columns="split_id", values="model_std")
-
-    prod_pivot = prod_pivot.reindex(index=prod_order, columns=prod_splits)
-    trade_pivot = trade_pivot.reindex(index=trade_order, columns=trade_splits)
-
-    prod_pivot.index = [pretty_block_label(value) for value in prod_pivot.index]
-    trade_pivot.index = [pretty_block_label(value) for value in trade_pivot.index]
-
-    model_order = ["Seasonal Naive", "ETS", "Theta", "LightGBM", "LSTM"]
-    model_to_num = {model: i for i, model in enumerate(model_order)}
-
-    prod_num = prod_pivot.copy()
-    trade_num = trade_pivot.copy()
-    for model, code in model_to_num.items():
-        prod_num = prod_num.replace(model, code)
-        trade_num = trade_num.replace(model, code)
-
-    prod_num = prod_num.apply(pd.to_numeric, errors="coerce")
-    trade_num = trade_num.apply(pd.to_numeric, errors="coerce")
-
-    palette = {
-        "Seasonal Naive": "#BDBDBD",
-        "ETS": "#4C78A8",
-        "Theta": "#72B7B2",
-        "LightGBM": "#F58518",
-        "LSTM": "#E45756",
-    }
-    cmap = ListedColormap([palette[model] for model in model_order])
-
-    fig, axes = plt.subplots(2, 1, figsize=(10.8, 6.4), gridspec_kw={"height_ratios": [4, 2]}, constrained_layout=True)
-
-    sns.heatmap(
-        prod_num,
-        annot=prod_pivot,
-        fmt="",
-        cmap=cmap,
-        cbar=False,
-        linewidths=0.8,
-        linecolor="white",
-        ax=axes[0],
-        vmin=0,
-        vmax=len(model_order) - 1,
-    )
-    axes[0].set_title("A. Split-wise winners in production benchmark blocks", loc="left", pad=8)
-    axes[0].set_xlabel("")
-    axes[0].set_ylabel("")
-    axes[0].set_xticklabels(prod_splits, rotation=0)
-    axes[0].set_yticklabels(axes[0].get_yticklabels(), rotation=0)
-
-    sns.heatmap(
-        trade_num,
-        annot=trade_pivot,
-        fmt="",
-        cmap=cmap,
-        cbar=False,
-        linewidths=0.8,
-        linecolor="white",
-        ax=axes[1],
-        vmin=0,
-        vmax=len(model_order) - 1,
-    )
-    axes[1].set_title("B. Split-wise winners in trade benchmark blocks", loc="left", pad=8)
-    axes[1].set_xlabel("Evaluation split")
-    axes[1].set_ylabel("")
-    axes[1].set_xticklabels(trade_splits, rotation=0)
-    axes[1].set_yticklabels(axes[1].get_yticklabels(), rotation=0)
-
-    for ax in axes:
-        for text in ax.texts:
-            label = text.get_text()
-            text.set_color("white" if label in ["LightGBM", "ETS", "Theta", "LSTM"] else "black")
-            text.set_fontsize(10)
-
-    handles = [mpatches.Patch(color=palette[model], label=model) for model in model_order]
-    fig.legend(handles=handles, title="Winner", loc="center left", bbox_to_anchor=(1.01, 0.82), frameon=False)
-
-    save_figure(fig, "Figure_5_Split_wise_winning_models_across_production_and_trade_benchmark_blocks")
-    plt.close(fig)
+    plt.rcParams.update({
+        "figure.dpi": 180,
+        "savefig.dpi": 600,
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "DejaVu Serif", "Liberation Serif"],
+        "font.size": 10,
+        "axes.titlesize": 11,
+        "legend.fontsize": 9,
+    })
+    prod_winners, trade_winners = _load_winners()
+    fig, axes = plt.subplots(2, 1, figsize=(10.8, 6.2), gridspec_kw={"height_ratios": [2.1, 1.1]})
+    _draw_map(axes[0], prod_winners, PRODUCTION_ROWS, ["S1", "S2", "S3"], "A. Production benchmark blocks")
+    _draw_map(axes[1], trade_winners, TRADE_ROWS, ["T1", "T2", "T3"], "B. Trade benchmark blocks")
+    handles = [Patch(facecolor=COLOURS[k], label=k, hatch="///" if k == "Fallback-contingent" else None) for k in COLOURS]
+    fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, bbox_to_anchor=(0.5, 0.00))
+    fig.tight_layout(rect=[0, 0.07, 1, 1])
+    save_figure(fig, FIGURE_DIR / "Figure5_execution_validity_aware_winners.png")
 
 
 if __name__ == "__main__":

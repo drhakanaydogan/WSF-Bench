@@ -1,12 +1,5 @@
-# Data availability statement
+# Data availability
 
-The raw data underlying this study are publicly available from Eurostat and FAOSTAT. This repository does not replace the original public databases. Instead, it provides the processed benchmark files used in the manuscript, including panel construction outputs, split definitions, and result tables required to reproduce the main analyses and figures.
+The repository uses official statistical data layers and derived analytical workbooks. The processed workbooks included in `data/processed/` provide the benchmark outputs used to generate the tables, figures, and diagnostic summaries. The master workbook in `data/raw/` provides the input structure used by the analysis scripts.
 
-At minimum, the following processed files should be placed in `data/processed/`:
-
-- `woodsciforecast_benchmark_protocol_v1.xlsx`
-- `woodsciforecast_first_baseline_results_v1.xlsx`
-- `woodsciforecast_second_round_results_v2.xlsx`
-- `woodsciforecast_round3_trade_deep_results_v1.xlsx`
-
-No proprietary data were used in this study.
+Users should verify source licences and access conditions for the underlying official data providers before redistribution beyond the benchmark package.

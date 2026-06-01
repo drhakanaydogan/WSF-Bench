@@ -2,105 +2,61 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from sklearn.preprocessing import StandardScaler
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.models import Sequential
-
-from src.config import (
-    LSTM_BATCH_SIZE,
-    LSTM_EPOCHS,
-    LSTM_LOOKBACK,
-    LSTM_PATIENCE,
-    LSTM_RANDOM_SEED,
-    LSTM_VALIDATION_SPLIT,
-)
 
 
-def build_lstm_sequences(df: pd.DataFrame, target: str, lookback: int, split_start: str, split_end: str) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, np.ndarray]]:
-    start = pd.Timestamp(split_start)
-    end = pd.Timestamp(split_end)
-
-    sequence_rows = []
-    train_cache: dict[str, np.ndarray] = {}
-
-    grouped = df[['country', 'date', target]].dropna().sort_values('date').groupby('country')
-    for country, group in grouped:
-        y = group[target].values
-        dates = group['date'].values
-        train_cache[country] = group[group['date'] < start][target].values
-
-        for i in range(lookback, len(group)):
-            sequence_rows.append({
-                'country': country,
-                'date': pd.Timestamp(dates[i]),
-                'y_true': y[i],
-                'seq': y[i - lookback:i],
-            })
-
-    sequence_df = pd.DataFrame(sequence_rows)
-    train_df = sequence_df[sequence_df['date'] < start].copy()
-    test_df = sequence_df[(sequence_df['date'] >= start) & (sequence_df['date'] <= end)].copy()
-    return train_df, test_df, train_cache
+def make_univariate_sequences(values: pd.Series, sequence_length: int = 12):
+    arr = pd.Series(values).dropna().astype(float).to_numpy()
+    x, y = [], []
+    for i in range(sequence_length, len(arr)):
+        x.append(arr[i - sequence_length:i])
+        y.append(arr[i])
+    if not x:
+        return np.empty((0, sequence_length, 1)), np.empty((0,))
+    return np.asarray(x, dtype=float)[..., None], np.asarray(y, dtype=float)
 
 
-def lstm_eval(
-    df: pd.DataFrame,
-    target: str,
-    split_start: str,
-    split_end: str,
-    lookback: int = LSTM_LOOKBACK,
-    epochs: int = LSTM_EPOCHS,
-    batch_size: int = LSTM_BATCH_SIZE,
-) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
-    train_df, test_df, train_cache = build_lstm_sequences(df, target, lookback, split_start, split_end)
+def fit_predict_lstm(train_values, test_values, sequence_length: int = 12, seed: int = 42):
+    import tensorflow as tf
+    from tensorflow.keras import Sequential
+    from tensorflow.keras.layers import LSTM, Dropout, Dense
+    from tensorflow.keras.callbacks import EarlyStopping
 
-    if train_df.empty or test_df.empty:
-        return pd.DataFrame(columns=['country', 'date', 'y_true', 'y_pred', 'model']), {}
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
 
-    x_train = np.stack(train_df['seq'].values)
-    x_test = np.stack(test_df['seq'].values)
-    y_train = train_df['y_true'].values
+    combined = pd.concat([pd.Series(train_values), pd.Series(test_values)], ignore_index=True)
+    train_x, train_y = make_univariate_sequences(pd.Series(train_values), sequence_length)
+    if train_x.shape[0] == 0:
+        return np.repeat(np.nan, len(test_values))
 
     scaler = StandardScaler()
-    x_train_2d = x_train.reshape(x_train.shape[0], x_train.shape[1])
-    x_test_2d = x_test.reshape(x_test.shape[0], x_test.shape[1])
-
-    x_train_scaled = scaler.fit_transform(x_train_2d).reshape(x_train.shape[0], x_train.shape[1], 1)
-    x_test_scaled = scaler.transform(x_test_2d).reshape(x_test.shape[0], x_test.shape[1], 1)
-
-    tf.keras.backend.clear_session()
-    tf.random.set_seed(LSTM_RANDOM_SEED)
-    np.random.seed(LSTM_RANDOM_SEED)
+    train_x_2d = train_x.reshape(train_x.shape[0], sequence_length)
+    train_x_scaled = scaler.fit_transform(train_x_2d).reshape(train_x.shape)
 
     model = Sequential([
-        LSTM(32, input_shape=(lookback, 1), return_sequences=False),
+        LSTM(32, input_shape=(sequence_length, 1)),
         Dropout(0.2),
-        Dense(16, activation='relu'),
+        Dense(16, activation="relu"),
         Dense(1),
     ])
-    model.compile(optimizer='adam', loss='mse')
-
-    early_stopping = EarlyStopping(
-        monitor='val_loss',
-        patience=LSTM_PATIENCE,
-        restore_best_weights=True,
-    )
-
+    model.compile(optimizer="adam", loss="mse")
     model.fit(
-        x_train_scaled,
-        y_train,
-        validation_split=LSTM_VALIDATION_SPLIT,
-        epochs=epochs,
-        batch_size=batch_size,
+        train_x_scaled,
+        train_y,
+        epochs=40,
+        batch_size=32,
+        validation_split=0.2,
         verbose=0,
-        callbacks=[early_stopping],
+        callbacks=[EarlyStopping(patience=5, restore_best_weights=True)],
     )
 
-    predictions = model.predict(x_test_scaled, verbose=0).flatten()
-
-    pred_df = test_df[['country', 'date', 'y_true']].copy()
-    pred_df['y_pred'] = predictions
-    pred_df['model'] = 'LSTM'
-    return pred_df, train_cache
+    preds = []
+    history = pd.Series(train_values).dropna().astype(float).tolist()
+    for value in pd.Series(test_values).astype(float).tolist():
+        window = np.asarray(history[-sequence_length:], dtype=float).reshape(1, sequence_length)
+        window_scaled = scaler.transform(window).reshape(1, sequence_length, 1)
+        pred = float(model.predict(window_scaled, verbose=0)[0, 0])
+        preds.append(pred)
+        history.append(value)
+    return np.asarray(preds, dtype=float)

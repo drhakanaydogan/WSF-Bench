@@ -2,10 +2,9 @@ pandas
 numpy
 openpyxl
 xlsxwriter
-statsmodels
-scikit-learn
-lightgbm
-tensorflow
-
 matplotlib
-seaborn
+scipy
+scikit-learn
+statsmodels
+lightgbm
+shap

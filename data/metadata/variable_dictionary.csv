@@ -1,18 +1,14 @@
-variable_name,layer,role,description
-date,all_panels,index,Monthly observation date.
-country,all_panels,panel_id,Country identifier used for panel-level grouping and pooled forecasting.
-year,derived,calendar_feature,Calendar year extracted from date.
-month,derived,calendar_feature,Calendar month extracted from date.
-ln_sts_c16_sa_idx2021_100,production,target,"Log-transformed seasonally adjusted industrial production index for wood and products of wood and cork, except furniture."
-ln_sts_c31_sa_idx2021_100,production,target,Log-transformed seasonally adjusted industrial production index for furniture manufacturing.
-ln_trade_world_export_eur_hs4sum,trade,target,Log-transformed total export value of aggregated wooden-furniture trade.
-ln_trade_world_import_eur_hs4sum,trade,target,Log-transformed total import value of aggregated wooden-furniture trade.
-fao_*,annual_anchors,auxiliary_predictor,Panel-specific FAOSTAT annual anchor variables repeated across monthly observations within country-year when available and non-missing in the training window.
-lag1,derived,feature,One-period lag of the target series within country.
-lag3,derived,feature,Three-period lag of the target series within country.
-lag6,derived,feature,Six-period lag of the target series within country.
-lag12,derived,feature,Twelve-period seasonal lag of the target series within country.
-diff1,derived,feature,First difference of the target series within country.
-diff12,derived,feature,Seasonal difference of the target series within country.
-month_sin,derived,feature,Sine encoding of calendar month.
-month_cos,derived,feature,Cosine encoding of calendar month.
+variable_group,variable_name,description
+production_target,C16,log-transformed seasonally adjusted industrial production index for wood and products of wood and cork except furniture
+production_target,C31,log-transformed seasonally adjusted industrial production index for furniture manufacturing
+trade_target,trade_export,log-transformed total export value of wooden furniture
+trade_target,trade_import,log-transformed total import value of wooden furniture
+feature_group,target_lags,target lags at 1 3 6 and 12 months
+feature_group,lagged_differences,strictly lagged first and seasonal difference terms
+feature_group,cyclic_calendar_terms,sine and cosine month encodings
+feature_group,country_indicators,country dummy variables aligned to the training design matrix
+feature_group,annual_anchors,eligible lagged annual FAOSTAT contextual predictors
+execution_code,V0,execution-valid pooled LightGBM run
+execution_code,E1,empty effective train or test design after feature construction and filtering
+execution_code,E2,empty or non-alignable feature matrix after dummy encoding and matrix alignment
+execution_code,E3,model fitting or prediction exception

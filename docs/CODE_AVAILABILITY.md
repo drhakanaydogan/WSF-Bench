@@ -1,14 +1,5 @@
-# Code availability statement
+# Code availability
 
-The code used to construct the benchmark panels, run the round-2 and round-3 forecasting experiments, and reproduce the main figures is contained in this repository.
+The repository contains the Python modules and scripts required to reproduce the analytical workflow. The code is organised into reusable modules for preprocessing, leakage-safe feature construction, model estimation, evaluation, execution-validity logging, figure generation, and diagnostic summaries.
 
-The repository includes Python scripts for:
-
-- benchmark panel loading and preprocessing,
-- classical baseline forecasting,
-- pooled LightGBM evaluation,
-- LSTM trade benchmarking,
-- split-wise metric aggregation, and
-- figure generation.
-
-The main executable scripts are located in `src/`.
+The implementation is deterministic where random seeds are used. Pooled LightGBM and the recurrent challenger use fixed random seeds to support reproducibility.

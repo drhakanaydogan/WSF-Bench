@@ -2,32 +2,40 @@ from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 
-def seasonal_naive_forecast(train_series: np.ndarray, horizon: int, season: int = 12) -> np.ndarray:
-    history = list(train_series)
-    predictions = []
-    for _ in range(horizon):
-        prediction = history[-season] if len(history) >= season else history[-1]
-        predictions.append(prediction)
-        history.append(prediction)
-    return np.asarray(predictions)
+def seasonal_naive_forecast(train: pd.Series, horizon: int, seasonal_period: int = 12) -> np.ndarray:
+    train = pd.Series(train).dropna().astype(float)
+    if len(train) >= seasonal_period:
+        pattern = train.iloc[-seasonal_period:].to_numpy()
+        return np.resize(pattern, horizon)
+    if len(train) > 0:
+        return np.repeat(train.iloc[-1], horizon)
+    return np.repeat(np.nan, horizon)
 
 
-def ets_forecast(train_series: np.ndarray, horizon: int) -> np.ndarray:
-    y = pd.Series(train_series).astype(float)
-    if len(y) < 24:
-        return np.repeat(y.iloc[-1], horizon)
+def last_observed_forecast(train: pd.Series, horizon: int) -> np.ndarray:
+    train = pd.Series(train).dropna().astype(float)
+    if len(train) == 0:
+        return np.repeat(np.nan, horizon)
+    return np.repeat(train.iloc[-1], horizon)
 
+
+def ets_forecast(train: pd.Series, horizon: int, seasonal_period: int = 12) -> np.ndarray:
+    train = pd.Series(train).dropna().astype(float)
+    if len(train) < seasonal_period * 2:
+        return last_observed_forecast(train, horizon)
     try:
-        fit = ExponentialSmoothing(
-            y,
-            trend='add',
-            seasonal='add',
-            seasonal_periods=12,
+        from statsmodels.tsa.holtwinters import ExponentialSmoothing
+        model = ExponentialSmoothing(
+            train,
+            trend="add",
             damped_trend=True,
-        ).fit(optimized=True, use_brute=False)
-        return np.asarray(fit.forecast(horizon))
+            seasonal="add",
+            seasonal_periods=seasonal_period,
+            initialization_method="estimated",
+        )
+        fit = model.fit(optimized=True)
+        return fit.forecast(horizon).to_numpy()
     except Exception:
-        return np.repeat(y.iloc[-1], horizon)
+        return last_observed_forecast(train, horizon)

@@ -1,66 +1,79 @@
 from __future__ import annotations
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 
-from src.config import BENCHMARK_PROTOCOL_FILE
-from src.figure_utils import save_figure, set_publication_style
-from src.io import load_benchmark_panels
+from config import PROTOCOL_FILE, FIGURE_DIR
+from figure_utils import save_figure
 
+TARGET_SPECS = [
+    ("production_panel_12c", "ln_sts_c16_sa_idx2021_100", "A. Production: C16"),
+    ("production_panel_12c", "ln_sts_c31_sa_idx2021_100", "B. Production: C31"),
+    ("trade_panel_8c", "ln_trade_world_export_eur_hs4sum", "C. Trade: exports"),
+    ("trade_panel_8c", "ln_trade_world_import_eur_hs4sum", "D. Trade: imports"),
+]
 
-MONTH_ORDER = list(range(1, 13))
 MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def monthly_profile(df: pd.DataFrame, value_col: str) -> pd.DataFrame:
-    summary = (
-        df.groupby("month")[value_col]
-        .agg(["mean", "std", "count"])
-        .reindex(MONTH_ORDER)
+def _monthly_profile(sheet_name: str, target: str) -> pd.DataFrame:
+    df = pd.read_excel(PROTOCOL_FILE, sheet_name=sheet_name)
+    df["date"] = pd.to_datetime(df["date"])
+    df["month"] = df["date"].dt.month
+    g = (
+        df[["month", target]]
+        .dropna()
+        .groupby("month")[target]
+        .agg(
+            mean="mean",
+            q25=lambda x: np.nanpercentile(x, 25),
+            q75=lambda x: np.nanpercentile(x, 75),
+        )
+        .reindex(range(1, 13))
         .reset_index()
     )
-    summary["se"] = summary["std"] / np.sqrt(summary["count"])
-    return summary
+    g["month_name"] = MONTH_LABELS
+    return g
 
 
 def main() -> None:
-    set_publication_style()
-    prod12, _, trade8 = load_benchmark_panels(BENCHMARK_PROTOCOL_FILE)
+    plt.rcParams.update({
+        "figure.dpi": 180,
+        "savefig.dpi": 600,
+        "font.family": "serif",
+        "font.serif": ["Times New Roman", "DejaVu Serif", "Liberation Serif"],
+        "font.size": 10,
+        "axes.titlesize": 11,
+        "axes.labelsize": 10,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
+        "axes.spines.top": False,
+        "axes.spines.right": False,
+    })
 
-    series_specs = [
-        ("A. Production: C16", prod12, "ln_sts_c16_sa_idx2021_100", "#4C78A8"),
-        ("B. Production: C31", prod12, "ln_sts_c31_sa_idx2021_100", "#72B7B2"),
-        ("C. Trade: Exports", trade8, "ln_trade_world_export_eur_hs4sum", "#F58518"),
-        ("D. Trade: Imports", trade8, "ln_trade_world_import_eur_hs4sum", "#E45756"),
-    ]
+    fig, axes = plt.subplots(2, 2, figsize=(10.8, 6.9), sharex=True)
+    axes = axes.ravel()
 
-    fig, axes = plt.subplots(2, 2, figsize=(12.6, 7.2), constrained_layout=True)
-    axes = axes.flatten()
-
-    for ax, (title, df, column, color) in zip(axes, series_specs):
-        profile = monthly_profile(df, column)
+    for ax, (sheet, target, title) in zip(axes, TARGET_SPECS):
+        profile = _monthly_profile(sheet, target)
         x = np.arange(1, 13)
-        y = profile["mean"].values
-        se = profile["se"].values
+        y = profile["mean"].to_numpy(dtype=float)
+        q25 = profile["q25"].to_numpy(dtype=float)
+        q75 = profile["q75"].to_numpy(dtype=float)
 
-        ax.plot(x, y, linewidth=2.0, marker="o", markersize=4.2, color=color, zorder=3)
-        ax.fill_between(x, y - se, y + se, color=color, alpha=0.12, zorder=2)
-        ax.set_title(title, loc="left", pad=6)
-        ax.set_xticks(x)
-        ax.set_xticklabels(MONTH_LABELS, rotation=0)
-        ax.set_xlim(1, 12)
+        ax.fill_between(x, q25, q75, alpha=0.12, linewidth=0)
+        ax.plot(x, y, marker="o", linewidth=1.5, markersize=3.2)
+        ax.set_title(title, loc="left", fontweight="bold")
         ax.set_ylabel("Log-transformed value")
-        ax.grid(axis="y", linestyle="--", alpha=0.25)
-        ax.grid(axis="x", visible=False)
-        ax.spines["left"].set_linewidth(0.8)
-        ax.spines["bottom"].set_linewidth(0.8)
+        ax.set_xticks(x)
+        ax.set_xticklabels(MONTH_LABELS)
+        ax.grid(axis="y", linestyle="--", alpha=0.28)
 
     axes[2].set_xlabel("Month")
     axes[3].set_xlabel("Month")
-
-    save_figure(fig, "Figure_3_Monthly_profiles_of_the_benchmark_targets")
-    plt.close(fig)
+    fig.tight_layout()
+    save_figure(fig, FIGURE_DIR / "Figure3_monthly_profiles.png")
 
 
 if __name__ == "__main__":

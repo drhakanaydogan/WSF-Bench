@@ -1,7 +1,9 @@
-panel_family,split_id,train_end_before,test_start,test_end,regime_label,notes
-production,S1,2014-12-01,2015-01-01,2019-12-01,pre_pandemic,Main pre-pandemic benchmark window for production panels.
-production,S2,2019-12-01,2020-01-01,2021-12-01,pandemic_shock,Pandemic-shock holdout window for production panels.
-production,S3,2021-12-01,2022-01-01,2024-12-01,post_shock,Post-shock and recovery window for production panels.
-trade,T1,2013-12-01,2014-01-01,2019-12-01,pre_pandemic,Main pre-pandemic benchmark window for trade panel.
-trade,T2,2019-12-01,2020-01-01,2021-12-01,pandemic_shock,Trade shock holdout window.
-trade,T3,2021-12-01,2022-01-01,2024-12-01,post_shock,Post-shock trade regime window.
+split_id,benchmark_group,start,end,role
+S0,production,2005-01,2014-12,warm_up
+S1,production,2015-01,2019-12,pre_pandemic
+S2,production,2020-01,2021-12,shock_holdout
+S3,production,2022-01,2024-12,post_shock
+T0,trade,2004-01,2013-12,warm_up
+T1,trade,2014-01,2019-12,pre_pandemic
+T2,trade,2020-01,2021-12,shock_holdout
+T3,trade,2022-01,2024-12,post_shock

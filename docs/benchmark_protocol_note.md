@@ -1,54 +1,20 @@
 # Benchmark protocol note
 
-This repository accompanies the benchmark study built around nested, regime-aware forecasting tasks for wood-related production and trade series.
+WSF-Bench uses task-specific panels rather than forcing production and trade indicators into one artificial common-country structure. The primary evaluation unit is the panel-target-split block.
 
-## Core benchmark structure
+The chronological windows are defined as disruption-relevant operating environments:
 
-The benchmark is organized into three main panel blocks:
+- pre-pandemic benchmark window,
+- pandemic-shock holdout,
+- post-shock evaluation window.
 
-1. `Production_12c` — main 12-country production benchmark
-2. `Production_8c` — production sensitivity benchmark aligned to the reduced trade-country scope
-3. `Trade_8c` — main 8-country trade benchmark
+The regime windows are not treated as statistically estimated breakpoints. They are used to evaluate whether forecasting performance and execution validity remain stable across operationally meaningful periods.
 
-## Evaluation logic
+Pooled LightGBM execution is classified using the following codes:
 
-The split architecture is chronological and regime-aware.
+- `V0`: execution-valid pooled LightGBM run,
+- `E1`: empty effective train/test design after feature construction and filtering,
+- `E2`: empty or non-alignable feature matrix,
+- `E3`: model fitting or prediction exception.
 
-### Production splits
-- `S1`: 2015-01 to 2019-12
-- `S2`: 2020-01 to 2021-12
-- `S3`: 2022-01 to 2024-12
-
-### Trade splits
-- `T1`: 2014-01 to 2019-12
-- `T2`: 2020-01 to 2021-12
-- `T3`: 2022-01 to 2024-12
-
-For each panel × target × split × model combination, the model is fit once using all observations dated before the split start and is then evaluated over the full split block. The protocol therefore uses fixed-origin block forecasting within split windows.
-
-## Model families
-
-Round 2 benchmark:
-- Seasonal Naive
-- ETS
-- pooled LightGBM
-
-Round 3 trade extension:
-- Seasonal Naive
-- ETS
-- pooled LightGBM
-- LSTM
-
-## Fallback rule
-
-The pooled LightGBM pipeline includes an explicit fallback rule. Fallback is triggered when:
-
-- the effective train or test design becomes empty after feature construction and missing-value filtering,
-- the aligned feature matrix collapses, or
-- model fitting or prediction raises an exception.
-
-In these cases, predictions default to a country-wise last-observed-value repeat rule across the test block and are labeled `LightGBM_fallback`.
-
-## Reproducibility note
-
-The repository is designed around processed benchmark files derived from public Eurostat and FAOSTAT sources. To reproduce the manuscript outputs, place the processed `.xlsx` files in `data/processed/` and run the scripts in `src/`.
+Fallback-contingent outputs are retained for auditability but are not treated as valid pooled LightGBM wins.

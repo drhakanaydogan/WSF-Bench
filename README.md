@@ -1,62 +1,71 @@
-# WSF-Bench repository scaffold
+# WSF-Bench Python Core
 
-This repository contains a cleaned Python implementation of the benchmark workflow used in the manuscript.
+This repository contains the curated data tables, Python scripts, diagnostic outputs, and figure/table generation utilities supporting the WSF-Bench analysis of wood-related production and trade monitoring.
 
-## Included components
+The package supports inspection and reproduction of the reported benchmark outputs, including leakage-safe model comparisons, execution-validity diagnostics, recurrent challenger results, regime-robustness indicators, grouped LightGBM interpretability summaries, supplementary tables, and publication figures.
 
-- fixed benchmark splits for production and trade panels
-- country-level baseline evaluation (Seasonal Naive and ETS)
-- pooled LightGBM benchmark with execution-validity logging and fallback handling
-- trade-only LSTM deep challenger
-- manuscript-facing summary tables and reproducible Excel outputs
+## Repository structure
 
-## Expected input files
-
-Place the following files in `data/processed/` before running the scripts:
-
-- `woodsciforecast_benchmark_protocol_v1.xlsx`
-- `woodsciforecast_first_baseline_results_v1.xlsx`
-- `woodsciforecast_second_round_results_v2.xlsx` (optional if re-running round 2)
-- `woodsciforecast_round3_trade_deep_results_v1.xlsx` (optional if re-running round 3)
-
-## Run scripts
-
-From the project root:
-
-```bash
-python -m src.run_round2_benchmark
-python -m src.run_round3_trade_deep
+```text
+woodsciforecast_repo/
+├── data/
+│   ├── raw/                 # Master input workbook
+│   ├── processed/           # Curated analysis workbooks and supporting outputs
+│   └── metadata/            # Split definitions and variable dictionary
+├── docs/                    # Data and code availability notes
+├── outputs/
+│   ├── figures/             # Generated figure outputs
+│   └── tables/              # Generated supplementary table outputs
+├── src/                     # Reproducible Python modules and scripts
+└── requirements.txt
 ```
 
-Generated outputs are written to `data/processed/` using the file names defined in `src/config.py`.
+## Scope of reproduction
 
+The repository is designed to reproduce the reported benchmark outputs from the curated analysis files included in `data/processed/`. It is not presented as a raw-data harvesting pipeline from external statistical portals. The official-data preparation steps are documented in the manuscript and supporting notes, and the curated benchmark workbooks are provided for transparent inspection.
 
-## Figure scripts
+## Main design choices
 
-After placing the processed Excel files in `data/processed/`, the manuscript figures can be regenerated with:
+- Forecasts are evaluated under fixed chronological split rules.
+- Pooled LightGBM uses only information available before the forecast block.
+- Fallback-contingent LightGBM outputs are retained for auditability but are not interpreted as valid pooled-learning wins.
+- MASE is the primary metric; MAE, RMSE, and sMAPE are reported as supporting metrics.
+- Regime-robustness indicators quantify changes in monitoring performance across pre-shock, shock, and post-shock windows.
+- Grouped SHAP summaries report feature-attribution patterns for execution-valid LightGBM runs.
+
+## Installation
 
 ```bash
-python -m src.make_figure2_timeline
-python -m src.make_figure3_monthly_profiles
-python -m src.make_figure4_main_comparison
-python -m src.make_figure5_winner_map
-python -m src.make_figure6_relative_trade_advantage
+python -m venv .venv
+source .venv/bin/activate      # macOS/Linux
+# .venv\Scripts\activate   # Windows
+pip install -r requirements.txt
 ```
 
-Figures are written to `outputs/figures/` in PNG, TIFF, and PDF formats.
+The focused recurrent challenger requires TensorFlow. Install `requirements-recurrent.txt` only if rerunning that component.
 
-## Adding Excel files
+```bash
+pip install -r requirements-recurrent.txt
+```
 
-Place your final Excel files manually in `data/processed/` using these exact names:
+## Main entry points
 
-- `woodsciforecast_benchmark_protocol_v1.xlsx`
-- `woodsciforecast_first_baseline_results_v1.xlsx`
-- `woodsciforecast_second_round_results_v2.xlsx`
-- `woodsciforecast_round3_trade_deep_results_v1.xlsx`
+Regenerate all manuscript and supplementary figures:
 
+```bash
+python src/run_all_figures.py
+```
 
-## Metadata and documentation
+Export supplementary tables from the diagnostics workbook:
 
-Additional benchmark metadata are provided in `data/metadata/`, and manuscript-facing availability notes are provided in `docs/`.
+```bash
+python src/build_supplementary_tables.py
+```
 
-Repository archive release updated for the synchronization.
+Rebuild diagnostics from the main benchmark workbook:
+
+```bash
+python src/build_diagnostics.py
+```
+
+The benchmark and recurrent-challenger scripts are provided in `src/` for transparent inspection and rerunning when the expected input workbooks are available.

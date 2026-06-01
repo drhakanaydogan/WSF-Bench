@@ -1,146 +1,83 @@
 from __future__ import annotations
 
-from typing import Any
-
+from dataclasses import dataclass
 import numpy as np
 import pandas as pd
-from lightgbm import LGBMRegressor
 
-from src.config import LIGHTGBM_PARAMS
-from src.features import build_lightgbm_features
+try:
+    from lightgbm import LGBMRegressor
+except Exception:  # pragma: no cover
+    LGBMRegressor = None
 
-
-def safe_last_value_fallback(train_values: np.ndarray, test_values: np.ndarray) -> np.ndarray:
-    if len(train_values) == 0:
-        return np.full(len(test_values), np.nan)
-    last_value = pd.Series(train_values).dropna().iloc[-1]
-    return np.repeat(last_value, len(test_values))
+from baselines import last_observed_forecast
+from config import LIGHTGBM_PARAMS
 
 
-def _build_fallback_predictions(df: pd.DataFrame, target: str, start: pd.Timestamp, end: pd.Timestamp) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
-    rows: list[pd.DataFrame] = []
-    train_cache: dict[str, np.ndarray] = {}
-
-    grouped = df[['country', 'date', target]].dropna().sort_values('date').groupby('country')
-    for country, group in grouped:
-        train_values = group[group['date'] < start][target].values
-        test_values = group[(group['date'] >= start) & (group['date'] <= end)][target].values
-        test_dates = group[(group['date'] >= start) & (group['date'] <= end)]['date'].values
-
-        if len(train_values) == 0 or len(test_values) == 0:
-            continue
-
-        predictions = safe_last_value_fallback(train_values, test_values)
-        rows.append(pd.DataFrame({
-            'country': country,
-            'date': pd.to_datetime(test_dates),
-            'y_true': test_values,
-            'y_pred': predictions,
-            'model': 'LightGBM_fallback',
-        }))
-        train_cache[country] = train_values
-
-    if not rows:
-        return pd.DataFrame(columns=['country', 'date', 'y_true', 'y_pred', 'model']), {}
-
-    return pd.concat(rows, ignore_index=True), train_cache
+@dataclass
+class LightGBMRunResult:
+    predictions: pd.DataFrame
+    status: str
+    failure_code: str | None
+    message: str
+    n_train: int
+    n_test: int
+    n_features: int
 
 
-def pooled_lgbm_eval(
+def _align_design_matrices(train_x: pd.DataFrame, test_x: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    train_encoded = pd.get_dummies(train_x, drop_first=False)
+    test_encoded = pd.get_dummies(test_x, drop_first=False)
+    test_encoded = test_encoded.reindex(columns=train_encoded.columns, fill_value=0)
+    return train_encoded, test_encoded
+
+
+def _fallback_predictions(test_df: pd.DataFrame, train_df: pd.DataFrame, target_col: str, country_col: str) -> pd.Series:
+    last_values = train_df.sort_values("date").groupby(country_col)[target_col].last()
+    return test_df[country_col].map(last_values)
+
+
+def fit_predict_pooled_lightgbm(
     df: pd.DataFrame,
-    target: str,
-    fao_columns: list[str],
-    split_start: str,
-    split_end: str,
-    panel_name: str,
-    split_id: str,
-    logs: list[dict[str, Any]],
-) -> tuple[pd.DataFrame, dict[str, np.ndarray]]:
-    data, feature_columns = build_lightgbm_features(df, target, fao_columns)
-    start = pd.Timestamp(split_start)
-    end = pd.Timestamp(split_end)
+    target_col: str,
+    feature_cols: list[str],
+    train_mask: pd.Series,
+    test_mask: pd.Series,
+    country_col: str = "country",
+) -> LightGBMRunResult:
+    train_df = df.loc[train_mask].copy()
+    test_df = df.loc[test_mask].copy()
 
-    train = data[data['date'] < start].copy()
-    test = data[(data['date'] >= start) & (data['date'] <= end)].copy()
+    if train_df.empty or test_df.empty:
+        preds = _fallback_predictions(test_df, train_df, target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E1", "empty effective train or test design", len(train_df), len(test_df), 0)
 
-    train = train[train[target].notna()].copy()
-    test = test[test[target].notna()].copy()
+    available_features = [c for c in feature_cols if c in df.columns and not train_df[c].isna().all()]
+    train_df = train_df.dropna(subset=[target_col] + available_features)
+    test_df = test_df.dropna(subset=available_features)
 
-    usable_features = []
-    for column in feature_columns:
-        if column == 'country':
-            usable_features.append(column)
-        elif column in train.columns and train[column].notna().sum() > 0:
-            usable_features.append(column)
+    if train_df.empty or test_df.empty:
+        preds = _fallback_predictions(test_df, df.loc[train_mask], target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E1", "empty effective design after feature filtering", len(train_df), len(test_df), 0)
 
-    train = train.dropna(subset=usable_features + [target]).copy()
-    test = test.dropna(subset=usable_features + [target]).copy()
+    try:
+        train_x, test_x = _align_design_matrices(train_df[available_features], test_df[available_features])
+    except Exception as exc:
+        preds = _fallback_predictions(test_df, df.loc[train_mask], target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E2", f"matrix alignment failure: {exc}", len(train_df), len(test_df), 0)
 
-    if train.shape[0] == 0 or test.shape[0] == 0:
-        logs.append({
-            'panel': panel_name,
-            'split_id': split_id,
-            'target': target,
-            'model': 'LightGBM',
-            'status': 'fallback_empty_train_or_test',
-            'train_rows': train.shape[0],
-            'test_rows': test.shape[0],
-        })
-        return _build_fallback_predictions(df, target, start, end)
+    if train_x.empty or test_x.empty or train_x.shape[1] == 0:
+        preds = _fallback_predictions(test_df, df.loc[train_mask], target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E2", "empty aligned feature matrix", len(train_df), len(test_df), train_x.shape[1] if not train_x.empty else 0)
 
-    x_train = pd.get_dummies(train[usable_features], columns=['country'], drop_first=False)
-    x_test = pd.get_dummies(test[usable_features], columns=['country'], drop_first=False)
-    x_train, x_test = x_train.align(x_test, join='left', axis=1, fill_value=0)
-
-    if x_train.shape[0] == 0 or x_train.shape[1] == 0 or x_test.shape[0] == 0:
-        logs.append({
-            'panel': panel_name,
-            'split_id': split_id,
-            'target': target,
-            'model': 'LightGBM',
-            'status': 'fallback_empty_matrix',
-            'train_rows': x_train.shape[0],
-            'test_rows': x_test.shape[0],
-            'n_features': x_train.shape[1] if x_train.ndim == 2 else 0,
-        })
-        return _build_fallback_predictions(df, target, start, end)
+    if LGBMRegressor is None:
+        preds = _fallback_predictions(test_df, df.loc[train_mask], target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E3", "LightGBM is not installed", len(train_df), len(test_df), train_x.shape[1])
 
     try:
         model = LGBMRegressor(**LIGHTGBM_PARAMS)
-        model.fit(x_train, train[target])
-        predictions = model.predict(x_test)
-
-        train_cache = {
-            country: group.loc[group['date'] < start, target].dropna().values
-            for country, group in df[['country', 'date', target]].groupby('country')
-        }
-
-        pred_df = test[['country', 'date']].copy()
-        pred_df['y_true'] = test[target].values
-        pred_df['y_pred'] = predictions
-        pred_df['model'] = 'LightGBM'
-
-        logs.append({
-            'panel': panel_name,
-            'split_id': split_id,
-            'target': target,
-            'model': 'LightGBM',
-            'status': 'success',
-            'train_rows': x_train.shape[0],
-            'test_rows': x_test.shape[0],
-            'n_features': x_train.shape[1],
-        })
-        return pred_df, train_cache
-
+        model.fit(train_x, train_df[target_col].astype(float))
+        preds = model.predict(test_x)
+        return LightGBMRunResult(test_df.assign(prediction=np.asarray(preds, dtype=float)), "valid", "V0", "execution-valid pooled LightGBM run", len(train_df), len(test_df), train_x.shape[1])
     except Exception as exc:
-        logs.append({
-            'panel': panel_name,
-            'split_id': split_id,
-            'target': target,
-            'model': 'LightGBM',
-            'status': f'fallback_exception: {str(exc)}',
-            'train_rows': x_train.shape[0],
-            'test_rows': x_test.shape[0],
-            'n_features': x_train.shape[1],
-        })
-        return _build_fallback_predictions(df, target, start, end)
+        preds = _fallback_predictions(test_df, df.loc[train_mask], target_col, country_col)
+        return LightGBMRunResult(test_df.assign(prediction=preds), "fallback", "E3", f"model fitting or prediction exception: {exc}", len(train_df), len(test_df), train_x.shape[1])
