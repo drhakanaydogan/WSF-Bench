@@ -1,0 +1,10 @@
+panel,model,mean_mase
+Production_12c,LightGBM,0.4030238630252689
+Production_12c,ETS,1.319647903546875
+Production_12c,Seasonal Naive,1.436256954578504
+Production_8c,LightGBM,0.448068335059101
+Production_8c,ETS,1.32050104962367
+Production_8c,Seasonal Naive,1.455850881267571
+Trade_8c,LightGBM,0.9460541610786763
+Trade_8c,ETS,1.486595772156745
+Trade_8c,Seasonal Naive,1.528113218994052

@@ -1,0 +1,19 @@
+panel,split_id,target,model,status,train_rows,test_rows,n_features,failure_code,interpretation
+Production_12c,S1,ln_sts_c16_sa_idx2021_100,LightGBM,success,1284,432,27,V0,Execution-valid pooled LightGBM run
+Production_12c,S2,ln_sts_c16_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1716,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_12c,S3,ln_sts_c16_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1716,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_12c,S1,ln_sts_c31_sa_idx2021_100,LightGBM,success,1284,432,27,V0,Execution-valid pooled LightGBM run
+Production_12c,S2,ln_sts_c31_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1716,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_12c,S3,ln_sts_c31_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1716,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_8c,S1,ln_sts_c16_sa_idx2021_100,LightGBM,success,856,288,23,V0,Execution-valid pooled LightGBM run
+Production_8c,S2,ln_sts_c16_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1144,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_8c,S3,ln_sts_c16_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1144,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_8c,S1,ln_sts_c31_sa_idx2021_100,LightGBM,success,856,288,23,V0,Execution-valid pooled LightGBM run
+Production_8c,S2,ln_sts_c31_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1144,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Production_8c,S3,ln_sts_c31_sa_idx2021_100,LightGBM,fallback_empty_train_or_test,1144,0,16,E1,Fallback-contingent prediction; not interpreted as pooled ML superiority
+Trade_8c,T1,ln_trade_world_export_eur_hs4sum,LightGBM,success,856,576,27,V0,Execution-valid pooled LightGBM run
+Trade_8c,T2,ln_trade_world_export_eur_hs4sum,LightGBM,success,1432,192,27,V0,Execution-valid pooled LightGBM run
+Trade_8c,T3,ln_trade_world_export_eur_hs4sum,LightGBM,success,1624,288,27,V0,Execution-valid pooled LightGBM run
+Trade_8c,T1,ln_trade_world_import_eur_hs4sum,LightGBM,success,856,576,27,V0,Execution-valid pooled LightGBM run
+Trade_8c,T2,ln_trade_world_import_eur_hs4sum,LightGBM,success,1432,192,27,V0,Execution-valid pooled LightGBM run
+Trade_8c,T3,ln_trade_world_import_eur_hs4sum,LightGBM,success,1624,288,27,V0,Execution-valid pooled LightGBM run

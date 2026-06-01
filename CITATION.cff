@@ -1,35 +1,38 @@
 cff-version: 1.2.0
 message: "If you use this repository, please cite it using the metadata below."
-title: "WoodSciForecast-Bench"
+title: "WSF-Bench Python Core"
 type: software
-version: "v1.0.0"
+version: "v2.0"
+date-released: "2026-06-01"
 doi: "10.5281/zenodo.19361332"
-url: "https://github.com/drhakanaydogan/WoodSciForecast-Bench"
-repository-code: "https://github.com/drhakanaydogan/WoodSciForecast-Bench"
+url: "https://github.com/drhakanaydogan/WSF-Bench"
+repository-code: "https://github.com/drhakanaydogan/WSF-Bench"
 license: "MIT"
 authors:
   - family-names: "Aydogan"
     given-names: "Hakan"
     orcid: "https://orcid.org/0000-0001-9482-9888"
 abstract: >
-  WoodSciForecast-Bench is a regime-aware framework for sustainable and resilient
-  monitoring of wood-related production and trade systems in Europe. The repository
-  provides processed benchmark files and reproducibility code for comparative
-  forecasting experiments involving classical baselines, pooled machine learning,
-  and deep-learning challengers under chronological split design and fixed-origin
-  block evaluation.
+  WSF-Bench is a regime-aware benchmarking architecture for sustainable monitoring
+  of wood-related production and trade systems. The v2.0 Python core provides
+  curated benchmark data, reproducibility scripts, diagnostic outputs, supplementary
+  tables, and high-resolution figure exports for leakage-safe model comparison,
+  execution-validity logging, no-fallback sensitivity analysis, paired statistical
+  validation, regime-robustness assessment, focused recurrent-challenger evaluation,
+  and grouped LightGBM interpretability.
 keywords:
-  - "resilient monitoring"
-  - "sustainable manufacturing"
+  - "regime-aware benchmarking"
+  - "sustainable monitoring"
   - "wood-related value chains"
-  - "predictive decision support"
-  - "structural change"
-  - "pooled machine learning"
+  - "time-series forecasting"
+  - "execution validity"
+  - "regime robustness"
+  - "LightGBM"
+  - "recurrent challenger"
 preferred-citation:
   type: article
-  title: "WoodSciForecast-Bench: A Regime-Aware Framework for Sustainable and Resilient Monitoring of Wood-Related Production and Trade Systems"
+  title: "WSF-Bench: A Regime-Aware Benchmarking Framework for Sustainable Monitoring of Wood-Related Production and Trade Systems"
   authors:
     - family-names: "Aydogan"
       given-names: "Hakan"
       orcid: "https://orcid.org/0000-0001-9482-9888"
-  doi: "10.5281/zenodo.19361332"
