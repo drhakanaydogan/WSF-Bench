@@ -4,6 +4,8 @@ This repository contains the curated data tables, Python scripts, diagnostic out
 
 The v2.0 package supports inspection and reproduction of the revised benchmark outputs, including leakage-safe model comparisons, execution-validity diagnostics, no-fallback sensitivity summaries, additional accuracy metrics, paired statistical tests, regime-robustness indicators, recurrent-challenger results, grouped LightGBM interpretability summaries, supplementary tables, and publication figures.
 
+![WSF-Bench overview](docs/assets/wsf-bench-github-overview.png)
+
 ## Repository Structure
 
 ```text
