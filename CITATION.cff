@@ -31,8 +31,14 @@ keywords:
   - "recurrent challenger"
 preferred-citation:
   type: article
-  title: "WSF-Bench: A Regime-Aware Benchmarking Framework for Sustainable Monitoring of Wood-Related Production and Trade Systems"
+  title: "WSF-Bench: A regime-aware benchmarking framework for sustainable monitoring of wood-related production and trade systems"
   authors:
     - family-names: "Aydogan"
       given-names: "Hakan"
       orcid: "https://orcid.org/0000-0001-9482-9888"
+  journal: "Journal of Cleaner Production"
+  volume: 571
+  year: 2026
+  start: 148778
+  issn: "0959-6526"
+  doi: "10.1016/j.jclepro.2026.148778"
